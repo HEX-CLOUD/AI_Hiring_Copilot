@@ -2,7 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import String, Integer, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
-
+from typing import Optional
 from app.db.base import Base
 
 
@@ -14,9 +14,10 @@ class Resume(Base):
         primary_key=True
     )
 
-    candidate_id: Mapped[int] = mapped_column(
-        ForeignKey("candidates.id")
-    )
+    candidate_id: Mapped[Optional[int]] = mapped_column(
+    ForeignKey("candidates.id"),
+    nullable=True
+)
 
     file_name: Mapped[str] = mapped_column(
         String(255),
