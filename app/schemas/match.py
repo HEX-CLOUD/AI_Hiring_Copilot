@@ -17,3 +17,11 @@ class CandidateJobMatchResponse(BaseModel):
     required_experience: int | None = None
     experience_match: bool
     fit_explanation: str
+
+
+class CandidateJobInsightResponse(CandidateJobMatchResponse):
+    candidate_summary: str
+    strengths: list[str]
+    weaknesses: list[str]
+    hiring_recommendation: str
+    recommendation_reason: str

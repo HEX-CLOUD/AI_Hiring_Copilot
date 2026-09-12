@@ -6,6 +6,7 @@ from fastapi import UploadFile
 from fastapi import File
 from fastapi import HTTPException
 from fastapi import Depends
+from fastapi import Response
 from fastapi import status
 
 from sqlalchemy.orm import Session
@@ -32,6 +33,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     status_code=status.HTTP_201_CREATED
 )
 async def extract_candidate(
+    response: Response,
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
@@ -85,6 +87,14 @@ async def extract_candidate(
     )
 
     if not candidate_result["created"]:
+        if not candidate_result["candidate"]:
+            raise HTTPException(
+                status_code=candidate_result["status_code"],
+                detail=candidate_result["message"]
+            )
+
+        response.status_code = status.HTTP_200_OK
+
         return {
             "created": False,
             "message": candidate_result["message"],

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import Field
 
 
@@ -21,6 +22,8 @@ class JobUpdate(BaseModel):
 
 
 class JobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     title: str | None = None
     description: str | None = None
@@ -29,9 +32,6 @@ class JobResponse(BaseModel):
     requirements: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class JobExtractResponse(JobResponse):

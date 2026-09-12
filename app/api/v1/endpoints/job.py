@@ -26,6 +26,7 @@ from app.services.job_service import (
 from app.services.matching_service import (
     MatchingService
 )
+from app.services.insight_service import InsightService
 from app.services.candidate_service import CandidateService
 
 from app.services.parsers.pdf_parser import (
@@ -34,6 +35,7 @@ from app.services.parsers.pdf_parser import (
 from app.services.parsers.docx_parser import DOCXParser
 from app.core.constants import ALLOWED_EXTENSIONS
 from app.schemas.match import (
+    CandidateJobInsightResponse,
     CandidateJobMatchResponse,
     JobCandidateMatchRequest
 )
@@ -89,6 +91,43 @@ def rank_candidates_for_job(
 
     return MatchingService.rank_candidates_for_job(
         CandidateService.get_all_models(db),
+        job
+    )
+
+
+@router.get(
+    "/{job_id}/candidates/{candidate_id}/insights",
+    response_model=CandidateJobInsightResponse
+)
+def get_candidate_job_insights(
+    job_id: int,
+    candidate_id: int,
+    db: Session = Depends(get_db)
+):
+    job = JobService.get_by_id(
+        db,
+        job_id
+    )
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found"
+        )
+
+    candidate = CandidateService.get_model_by_id(
+        db,
+        candidate_id
+    )
+
+    if not candidate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate not found"
+        )
+
+    return InsightService.generate_candidate_job_insight(
+        candidate,
         job
     )
 

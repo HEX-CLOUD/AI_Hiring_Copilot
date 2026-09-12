@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CandidateExtractResponse(BaseModel):
@@ -28,6 +28,8 @@ class CandidateUpdate(BaseModel):
 
 
 class CandidateDBResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     full_name: str
     email: str
@@ -38,11 +40,14 @@ class CandidateDBResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class CandidateUploadResponse(BaseModel):
     created: bool
     message: str
     candidate: CandidateDBResponse | None = None
+
+
+class CandidateSearchResponse(CandidateDBResponse):
+    relevance_score: float
+    matched_terms: list[str] = Field(default_factory=list)
+    search_explanation: str

@@ -13,9 +13,11 @@ from app.services.candidate_service import (
 )
 from app.services.job_service import JobService
 from app.services.matching_service import MatchingService
+from app.services.search_service import SearchService
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateDBResponse,
+    CandidateSearchResponse,
     CandidateUpdate
 )
 from app.schemas.match import CandidateJobMatchResponse
@@ -78,6 +80,22 @@ def search_candidates(
     return CandidateService.search(
         db,
         q
+    )
+
+
+@router.get(
+    "/semantic-search",
+    response_model=list[CandidateSearchResponse]
+)
+def semantic_search_candidates(
+    q: str = Query(min_length=1),
+    limit: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db)
+):
+    return SearchService.search_candidates(
+        db,
+        query=q,
+        limit=limit
     )
 
 

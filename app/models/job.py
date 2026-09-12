@@ -1,9 +1,13 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import String, Integer, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+
+
+def utc_now():
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Job(Base):
@@ -43,11 +47,11 @@ class Job(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow
+        default=utc_now
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        default=utc_now,
+        onupdate=utc_now
     )

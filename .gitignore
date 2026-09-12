@@ -10,6 +10,7 @@ __pycache__/
 .vscode/
 
 .pytest_cache/
+tests/_tmp_uploads/
 
 .DS_Store
 
