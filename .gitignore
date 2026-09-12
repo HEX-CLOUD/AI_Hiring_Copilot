@@ -2,6 +2,7 @@ venv/
 
 __pycache__/
 *.pyc
+*.db
 
 .env
 
@@ -12,6 +13,5 @@ __pycache__/
 
 .DS_Store
 
-alembic/versions/*.py
-
 postgres_data/
+uploads/

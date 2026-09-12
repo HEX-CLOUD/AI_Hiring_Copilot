@@ -1,4 +1,5 @@
 from pypdf import PdfReader
+from docx import Document
 
 
 class ParserService:
@@ -14,3 +15,13 @@ class ParserService:
             text += page.extract_text() or ""
 
         return text
+
+    @staticmethod
+    def extract_docx_text(file_path: str) -> str:
+
+        document = Document(file_path)
+
+        return "\n".join(
+            paragraph.text
+            for paragraph in document.paragraphs
+        )

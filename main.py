@@ -1,4 +1,11 @@
 from fastapi import FastAPI
+from app.db.base import Base
+from app.db.session import engine
+
+from app.models.candidate import Candidate
+from app.models.job import Job
+
+Base.metadata.create_all(bind=engine)
 
 from app.api.v1.router import api_router
 

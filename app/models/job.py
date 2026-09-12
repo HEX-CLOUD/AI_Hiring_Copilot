@@ -6,8 +6,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 
 
-class Candidate(Base):
-    __tablename__ = "candidates"
+class Job(Base):
+    __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(
         Integer,
@@ -15,26 +15,30 @@ class Candidate(Base):
         index=True
     )
 
-    full_name: Mapped[str] = mapped_column(
+    title: Mapped[str] = mapped_column(
         String(255),
-        nullable=False
-    )
-
-    email: Mapped[str] = mapped_column(
-        String(255),
-        unique=True,
-        nullable=False
-    )
-
-    phone: Mapped[str] = mapped_column(
-        String(50),
         nullable=True
     )
 
-   
-    years_experience: Mapped[int] = mapped_column(
+    description: Mapped[str] = mapped_column(
+        String,
+        nullable=True
+    )
+
+    min_experience: Mapped[int] = mapped_column(
         Integer,
         nullable=True
+    )
+
+    skills: Mapped[list] = mapped_column(
+        JSON,
+        nullable=False
+    )
+
+    requirements: Mapped[list] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -47,13 +51,3 @@ class Candidate(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
-
-    skills: Mapped[str] = mapped_column(
-    String,
-    nullable=True
-    )
-
-    resume_path: Mapped[str] = mapped_column(
-    String(255),
-    nullable=True
-)

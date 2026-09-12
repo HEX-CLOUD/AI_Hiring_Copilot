@@ -2,7 +2,8 @@ from logging.config import fileConfig
 from app.db.base import Base
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-from app.models import Candidate, Resume
+from app.core.config import settings
+from app.models import Candidate, Job, Resume
 from alembic import context
 
 # this is the Alembic Config object, which provides
@@ -13,6 +14,8 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
