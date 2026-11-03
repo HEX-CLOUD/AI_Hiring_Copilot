@@ -72,9 +72,16 @@ flowchart LR
 | Implemented | Resume/job parsing, structured extraction, candidate CRUD, job CRUD, matching, explainable score breakdown, pipeline stages, recruiter decisions. |
 | Implemented | MiniLM semantic search, ChromaDB index refresh, local Phi-3 query planning, hybrid SQL + semantic retrieval, optional local RAG brief. |
 | Implemented | Random Forest training/status/dataset APIs based on recruiter decision labels. |
+| Implemented | Collapsible **ML evaluation & safeguards** panel in AI Intelligence, showing training-record count, holdout MAE/R², and global feature importance. |
 | Planned | SHAP per-prediction explanations, formal bias metrics, learned model as the primary live ranker, authentication, production deployment. |
 
 > The bundled demo data is synthetic. It proves the workflow and should not be presented as real candidate data or a real-world model-quality benchmark.
+
+### ML evaluation panel
+
+Open **AI Intelligence → ML evaluation & safeguards** to inspect the supervised-learning workflow. The Random Forest is trained from recorded recruiter workflow labels and reports its training sample count, holdout MAE/R², and global feature importance. This is an **offline research-evaluation prediction**, not a live candidate recommendation or an estimate of a person’s performance or retention.
+
+The seeded demo uses 12 synthetic workflow labels. Its metrics demonstrate that the pipeline runs end to end; they must not be interpreted as real-world hiring-quality evidence.
 
 ---
 
