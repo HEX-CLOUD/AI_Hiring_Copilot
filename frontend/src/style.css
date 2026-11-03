@@ -1485,6 +1485,81 @@ button {
   display: flex;
   gap: 10px;
 }
+.ml-lab {
+  margin-top: 16px;
+  overflow: hidden;
+}
+.ml-lab summary {
+  min-height: 58px;
+  padding: 0 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 16px;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+.ml-lab summary::-webkit-details-marker { display: none; }
+.ml-lab summary > span {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: #2e5133;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ml-lab summary small {
+  color: #7a857c;
+  font: 9px "DM Mono", monospace;
+}
+.ml-lab summary > svg { transition: transform .2s ease; }
+.ml-lab[open] summary > svg { transform: rotate(90deg); }
+.ml-lab-body {
+  padding: 15px 18px 18px;
+  border-top: 1px solid #e7e9e4;
+  background: #fbfcf9;
+}
+.ml-lab-body > p {
+  margin: 0 0 13px;
+  color: #5d695f;
+  font-size: 11px;
+  line-height: 1.55;
+}
+.ml-stat-grid {
+  margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.ml-stat-grid div {
+  padding: 10px;
+  border: 1px solid #e3e9df;
+  border-radius: 8px;
+  background: #f2f6ef;
+}
+.ml-stat-grid span,
+.ml-stat-grid b { display: block; }
+.ml-stat-grid span { color: #778078; font-size: 9px; }
+.ml-stat-grid b { margin-top: 3px; color: #315537; font-size: 16px; }
+.ml-importance > b {
+  display: block;
+  margin-bottom: 8px;
+  color: #526153;
+  font-size: 11px;
+}
+.ml-importance > div {
+  margin: 7px 0;
+  display: grid;
+  grid-template-columns: 120px 1fr 32px;
+  gap: 8px;
+  align-items: center;
+}
+.ml-importance span { color: #667068; font-size: 10px; text-transform: capitalize; }
+.ml-importance i { height: 5px; overflow: hidden; border-radius: 10px; background: #e3e9e1; }
+.ml-importance em { height: 100%; display: block; border-radius: inherit; background: #5f8761; }
+.ml-importance strong { color: #426247; font: 10px "DM Mono", monospace; text-align: right; }
+.ml-lab-body .secondary-button { margin-top: 9px; }
+.ml-guardrail { display: block; margin-top: 11px; color: #7b827b; font-size: 10px; line-height: 1.45; }
 .ai-query label {
   min-width: 0;
   height: 42px;
