@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.db.base import Base
 from app.db.session import engine
 
@@ -10,8 +11,21 @@ Base.metadata.create_all(bind=engine)
 from app.api.v1.router import api_router
 
 app = FastAPI(
-    title="AI Hiring Copilot",
+    title="TalentIQ AI Hiring Intelligence",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(
@@ -24,5 +38,5 @@ app.include_router(
 def health_check():
     return {
         "status": "healthy",
-        "service": "AI Hiring Copilot"
+        "service": "TalentIQ AI Hiring Intelligence"
     }

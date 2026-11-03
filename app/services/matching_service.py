@@ -73,9 +73,45 @@ class MatchingService:
 
         if required_experience is None:
             score = skill_score
+            score_breakdown = [
+                {
+                    "signal": "Required skill coverage",
+                    "weight": 100,
+                    "raw_score": round(skill_score, 2),
+                    "contribution": round(skill_score, 2),
+                    "description": f"Matched {len(matched)} of {len(jd_skills)} required skills.",
+                },
+                {
+                    "signal": "Experience requirement",
+                    "weight": 0,
+                    "raw_score": None,
+                    "contribution": 0,
+                    "description": "No minimum experience requirement was defined for this role.",
+                },
+            ]
         else:
             experience_score = 100 if experience_match else 0
             score = (skill_score * 0.8) + (experience_score * 0.2)
+            score_breakdown = [
+                {
+                    "signal": "Required skill coverage",
+                    "weight": 80,
+                    "raw_score": round(skill_score, 2),
+                    "contribution": round(skill_score * 0.8, 2),
+                    "description": f"Matched {len(matched)} of {len(jd_skills)} required skills.",
+                },
+                {
+                    "signal": "Experience requirement",
+                    "weight": 20,
+                    "raw_score": experience_score,
+                    "contribution": round(experience_score * 0.2, 2),
+                    "description": (
+                        f"Meets the {required_experience}+ years requirement."
+                        if experience_match
+                        else f"Does not meet the {required_experience}+ years requirement."
+                    ),
+                },
+            ]
 
         return {
             "match_score": round(score, 2),
@@ -84,6 +120,11 @@ class MatchingService:
             "candidate_experience": candidate_experience,
             "required_experience": required_experience,
             "experience_match": experience_match,
+            "score_breakdown": score_breakdown,
+            "fairness_note": (
+                "This score uses only stated role skills and experience. "
+                "Review the underlying evidence; it is decision support, not an automated hiring decision."
+            ),
             "fit_explanation": MatchingService.build_fit_explanation(
                 round(score, 2),
                 matched,

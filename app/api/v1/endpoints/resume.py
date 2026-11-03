@@ -64,6 +64,7 @@ async def extract_candidate(
         else:
             text = DOCXParser.extract_text(str(temp_path))
     except Exception as exc:
+        temp_path.unlink(missing_ok=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Could not parse uploaded resume"
@@ -76,6 +77,7 @@ async def extract_candidate(
     phone = ExtractionService.extract_phone(text)
 
     skills = ExtractionService.extract_skills(text)
+    structured_profile = ExtractionService.extract_structured_profile(text)
 
     candidate_result = CandidateService.create_candidate(
         db=db,
@@ -83,10 +85,23 @@ async def extract_candidate(
         email=email,
         phone=phone,
         skills=skills,
-        resume_path=str(temp_path)
+        resume_path=str(temp_path),
+        education=structured_profile["education"],
+        projects=structured_profile["projects"],
+        certifications=structured_profile["certifications"],
+        work_history=structured_profile["work_history"],
+        source_text=text,
+        extraction_metadata={
+            **structured_profile["metadata"],
+            "filename": file.filename,
+            "extension": extension,
+        }
     )
 
     if not candidate_result["created"]:
+        # The existing candidate already owns its prior resume, so discard this retry.
+        temp_path.unlink(missing_ok=True)
+
         if not candidate_result["candidate"]:
             raise HTTPException(
                 status_code=candidate_result["status_code"],

@@ -3,6 +3,18 @@ import re
 
 class ExtractionService:
 
+    SECTION_ALIASES = {
+        "education": {"education", "academic background", "qualifications"},
+        "projects": {"projects", "selected projects", "personal projects"},
+        "certifications": {"certifications", "certificates", "licenses"},
+        "work_history": {
+            "experience",
+            "work experience",
+            "professional experience",
+            "employment history",
+        },
+    }
+
     SKILLS = [
         "Python",
         "C++",
@@ -152,3 +164,63 @@ class ExtractionService:
                 requirements.append(cleaned)
 
         return list(dict.fromkeys(requirements))[:12]
+
+    @staticmethod
+    def _section_name(line: str):
+        normalized = re.sub(r"[^a-z ]", "", line.lower()).strip()
+
+        for section, aliases in ExtractionService.SECTION_ALIASES.items():
+            if normalized in aliases:
+                return section
+
+        return None
+
+    @staticmethod
+    def extract_sections(text: str):
+        sections = {
+            section: []
+            for section in ExtractionService.SECTION_ALIASES
+        }
+        current_section = None
+
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            detected_section = ExtractionService._section_name(line)
+            if detected_section:
+                current_section = detected_section
+                continue
+
+            if current_section:
+                cleaned = re.sub(
+                    r"^[\-*\u2022\d\.\)\s]+",
+                    "",
+                    line
+                ).strip()
+                if cleaned:
+                    sections[current_section].append(cleaned)
+
+        return {
+            section: list(dict.fromkeys(values))[:20]
+            for section, values in sections.items()
+        }
+
+    @staticmethod
+    def extract_structured_profile(text: str):
+        sections = ExtractionService.extract_sections(text)
+        extracted_fields = [
+            field
+            for field, values in sections.items()
+            if values
+        ]
+
+        return {
+            **sections,
+            "metadata": {
+                "parser": "heuristic-v1",
+                "extracted_fields": extracted_fields,
+                "source_character_count": len(text),
+            },
+        }

@@ -14,6 +14,7 @@ from app.services.candidate_service import (
 from app.services.job_service import JobService
 from app.services.matching_service import MatchingService
 from app.services.search_service import SearchService
+from app.services.vector_search_service import VectorSearchService
 from app.schemas.candidate import (
     CandidateCreate,
     CandidateDBResponse,
@@ -58,6 +59,7 @@ def get_candidates(
     skills: str | None = Query(default=None),
     min_experience: int | None = Query(default=None, ge=0),
     max_experience: int | None = Query(default=None, ge=0),
+    pipeline_stage: str | None = Query(default=None),
     db: Session = Depends(get_db)
 ):
 
@@ -65,7 +67,8 @@ def get_candidates(
         db,
         skills=skills,
         min_experience=min_experience,
-        max_experience=max_experience
+        max_experience=max_experience,
+        pipeline_stage=pipeline_stage
     )
 
 
@@ -92,11 +95,12 @@ def semantic_search_candidates(
     limit: int = Query(default=10, ge=1, le=50),
     db: Session = Depends(get_db)
 ):
-    return SearchService.search_candidates(
+    results, _ = VectorSearchService.search_candidates(
         db,
         query=q,
         limit=limit
     )
+    return results
 
 
 @router.get(

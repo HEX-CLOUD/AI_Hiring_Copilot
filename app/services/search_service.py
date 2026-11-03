@@ -20,6 +20,17 @@ class SearchService:
         "to",
         "with",
         "years",
+        "year",
+        "yr",
+        "yrs",
+        "more",
+        "minimum",
+        "minimums",
+        "at",
+        "least",
+        "over",
+        "above",
+        "plus",
         "experience",
         "candidate",
         "engineer",
@@ -46,6 +57,11 @@ class SearchService:
                 serialized["email"] or "",
                 str(serialized["years_experience"] or ""),
                 " ".join(serialized["skills"]),
+                " ".join(serialized["education"]),
+                " ".join(serialized["projects"]),
+                " ".join(serialized["certifications"]),
+                " ".join(serialized["work_history"]),
+                serialized["source_text"] or "",
             ]
         )
 
@@ -101,3 +117,79 @@ class SearchService:
             key=lambda result: result["relevance_score"],
             reverse=True,
         )[:limit]
+
+    @staticmethod
+    def search_candidates_with_filters(db, query: str, filters: dict, limit: int = 10):
+        """Apply validated SQL constraints before any relevance ranking."""
+        if filters.get("has_constraints"):
+            selected, _ = SearchService.filter_candidate_models(db, filters)
+            return SearchService.rank_filtered_candidates(query, selected, limit)
+        return SearchService.search_candidates(db, query, limit)
+
+    @staticmethod
+    def filter_candidate_models(db, filters: dict):
+        """Compile a validated filter plan into parameterized SQLAlchemy SQL.
+
+        The LLM never supplies SQL. It only proposes a small typed plan, and
+        this method is the sole compiler from that plan to database predicates.
+        """
+        from sqlalchemy import and_, case, func, literal, not_, or_
+        from app.models.candidate import Candidate
+
+        query = db.query(Candidate)
+        clauses = []
+        min_years = filters.get("min_experience")
+        max_years = filters.get("max_experience")
+        if min_years is not None:
+            clauses.append(Candidate.years_experience >= min_years)
+        if max_years is not None:
+            clauses.append(Candidate.years_experience <= max_years)
+
+        # Candidate skills are stored as normalized comma-separated tokens.
+        # Wrapping both sides with commas prevents "Java" matching "JavaScript".
+        skill_text = literal(",") + func.lower(func.coalesce(Candidate.skills, "")) + literal(",")
+
+        def escape_like(value: str) -> str:
+            return value.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+        def has_skill(value: str):
+            return skill_text.like(f"%,{escape_like(value)},%", escape="\\")
+
+        required = [has_skill(skill) for skill in filters.get("required_skills", [])]
+        alternatives = [has_skill(skill) for skill in filters.get("any_skills", [])]
+        exclusive = [has_skill(skill) for skill in filters.get("exclusive_skills", [])]
+        excluded = [has_skill(skill) for skill in filters.get("excluded_skills", [])]
+        if required:
+            clauses.append(and_(*required))
+        if alternatives:
+            clauses.append(or_(*alternatives))
+        if exclusive:
+            # XOR means exactly one named skill. A profile containing both
+            # Python and Java therefore fails this predicate.
+            clauses.append(sum((case((predicate, 1), else_=0) for predicate in exclusive), literal(0)) == 1)
+        if excluded:
+            clauses.extend(not_(predicate) for predicate in excluded)
+
+        if clauses:
+            query = query.filter(and_(*clauses))
+        query = query.order_by(Candidate.years_experience.desc(), Candidate.id.asc())
+        compiled = query.statement.compile(
+            dialect=db.get_bind().dialect,
+            compile_kwargs={"literal_binds": True},
+        )
+        sql_preview = " ".join(str(compiled).split())
+        return query.all(), sql_preview
+
+    @staticmethod
+    def rank_filtered_candidates(query: str, candidates: list, limit: int):
+        results = []
+        for candidate in candidates:
+            lexical = SearchService.score_candidate(query, candidate)
+            serialized = CandidateService._serialize_candidate(candidate)
+            results.append({
+                **serialized,
+                "relevance_score": lexical["score"],
+                "matched_terms": lexical["matched_terms"],
+                "search_explanation": "Matched the explicit experience/skill filters; ranked by query evidence.",
+            })
+        return sorted(results, key=lambda item: item["relevance_score"], reverse=True)[:limit]

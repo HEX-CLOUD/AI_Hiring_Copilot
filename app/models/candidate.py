@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import String, Integer, DateTime, JSON
+from sqlalchemy import String, Integer, DateTime, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -61,3 +61,44 @@ class Candidate(Base):
     String(255),
     nullable=True
 )
+
+    education: Mapped[list] = mapped_column(
+        JSON,
+        nullable=True
+    )
+
+    projects: Mapped[list] = mapped_column(
+        JSON,
+        nullable=True
+    )
+
+    certifications: Mapped[list] = mapped_column(
+        JSON,
+        nullable=True
+    )
+
+    work_history: Mapped[list] = mapped_column(
+        JSON,
+        nullable=True
+    )
+
+    source_text: Mapped[str] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    extraction_metadata: Mapped[dict] = mapped_column(
+        JSON,
+        nullable=True
+    )
+
+    pipeline_stage: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="new"
+    )
+
+    recruiter_notes: Mapped[str] = mapped_column(
+        Text,
+        nullable=True
+    )

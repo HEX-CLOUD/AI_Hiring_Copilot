@@ -19,5 +19,6 @@ langchain
 langgraph
 
 chromadb
+sentence-transformers
 
 pytest

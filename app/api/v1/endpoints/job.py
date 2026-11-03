@@ -28,6 +28,7 @@ from app.services.matching_service import (
 )
 from app.services.insight_service import InsightService
 from app.services.candidate_service import CandidateService
+from app.services.decision_service import DecisionService
 
 from app.services.parsers.pdf_parser import (
     PDFParser
@@ -38,6 +39,10 @@ from app.schemas.match import (
     CandidateJobInsightResponse,
     CandidateJobMatchResponse,
     JobCandidateMatchRequest
+)
+from app.schemas.decision import (
+    CandidateJobDecisionResponse,
+    CandidateJobDecisionUpdate,
 )
 
 router = APIRouter()
@@ -129,6 +134,57 @@ def get_candidate_job_insights(
     return InsightService.generate_candidate_job_insight(
         candidate,
         job
+    )
+
+
+@router.get(
+    "/{job_id}/decisions",
+    response_model=list[CandidateJobDecisionResponse],
+)
+def get_candidate_decisions_for_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+):
+    job = JobService.get_by_id(db, job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found",
+        )
+
+    return DecisionService.get_for_job(db, job_id)
+
+
+@router.put(
+    "/{job_id}/candidates/{candidate_id}/decision",
+    response_model=CandidateJobDecisionResponse,
+)
+def save_candidate_job_decision(
+    job_id: int,
+    candidate_id: int,
+    payload: CandidateJobDecisionUpdate,
+    db: Session = Depends(get_db),
+):
+    job = JobService.get_by_id(db, job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found",
+        )
+
+    candidate = CandidateService.get_model_by_id(db, candidate_id)
+    if not candidate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate not found",
+        )
+
+    return DecisionService.upsert(
+        db,
+        candidate_id,
+        job_id,
+        payload.decision,
+        payload.notes,
     )
 
 
@@ -256,16 +312,21 @@ async def extract_job(
         else:
             text = DOCXParser.extract_text(str(temp_path))
     except Exception as exc:
+        temp_path.unlink(missing_ok=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Could not parse uploaded job description"
         ) from exc
 
-    return JobService.create_from_text(
-        db=db,
-        title=Path(file.filename or "Untitled Job").stem,
-        text=text
-    )
+    try:
+        return JobService.create_from_text(
+            db=db,
+            title=Path(file.filename or "Untitled Job").stem,
+            text=text
+        )
+    finally:
+        # Job documents are parsed into structured fields and are not retained.
+        temp_path.unlink(missing_ok=True)
 
 
 @router.post(

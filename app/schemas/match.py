@@ -5,6 +5,14 @@ class JobCandidateMatchRequest(BaseModel):
     job_id: int
 
 
+class ScoreComponentResponse(BaseModel):
+    signal: str
+    weight: float
+    raw_score: float | None = None
+    contribution: float
+    description: str
+
+
 class CandidateJobMatchResponse(BaseModel):
     candidate_id: int
     candidate_name: str
@@ -16,6 +24,8 @@ class CandidateJobMatchResponse(BaseModel):
     candidate_experience: int | None = None
     required_experience: int | None = None
     experience_match: bool
+    score_breakdown: list[ScoreComponentResponse]
+    fairness_note: str
     fit_explanation: str
 
 

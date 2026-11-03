@@ -11,13 +11,16 @@ services:
       - .env
 
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_hiring
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/ai_hiring
 
     depends_on:
       - postgres
 
+    command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"
+
     volumes:
       - ./uploads:/app/uploads
+      - chroma_data:/app/data/chroma
 
   postgres:
     image: postgres:16
@@ -39,3 +42,4 @@ services:
 
 volumes:
   postgres_data:
+  chroma_data:

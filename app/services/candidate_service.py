@@ -40,6 +40,14 @@ class CandidateService:
             "years_experience": candidate.years_experience,
             "skills": skills,
             "resume_path": candidate.resume_path,
+            "education": candidate.education or [],
+            "projects": candidate.projects or [],
+            "certifications": candidate.certifications or [],
+            "work_history": candidate.work_history or [],
+            "source_text": candidate.source_text,
+            "extraction_metadata": candidate.extraction_metadata or {},
+            "pipeline_stage": candidate.pipeline_stage,
+            "recruiter_notes": candidate.recruiter_notes,
             "created_at": candidate.created_at,
             "updated_at": candidate.updated_at,
         }
@@ -51,7 +59,15 @@ class CandidateService:
         email,
         phone,
         skills,
-        resume_path
+        resume_path,
+        education=None,
+        projects=None,
+        certifications=None,
+        work_history=None,
+        source_text=None,
+        extraction_metadata=None,
+        pipeline_stage="new",
+        recruiter_notes=None
     ):
         if not name:
             name = "Unknown Candidate"
@@ -83,7 +99,15 @@ class CandidateService:
             email=email,
             phone=phone,
             skills=CandidateService._skills_to_string(skills),
-            resume_path=resume_path
+            resume_path=resume_path,
+            education=education or [],
+            projects=projects or [],
+            certifications=certifications or [],
+            work_history=work_history or [],
+            source_text=source_text,
+            extraction_metadata=extraction_metadata or {},
+            pipeline_stage=pipeline_stage,
+            recruiter_notes=recruiter_notes,
         )
 
         db.add(candidate)
@@ -107,7 +131,15 @@ class CandidateService:
             email=data.email,
             phone=data.phone,
             skills=data.skills,
-            resume_path=data.resume_path
+            resume_path=data.resume_path,
+            education=data.education,
+            projects=data.projects,
+            certifications=data.certifications,
+            work_history=data.work_history,
+            source_text=data.source_text,
+            extraction_metadata=data.extraction_metadata,
+            pipeline_stage=data.pipeline_stage,
+            recruiter_notes=data.recruiter_notes,
         )
 
         if result["created"] and data.years_experience is not None:
@@ -151,7 +183,8 @@ class CandidateService:
         db,
         skills: str | None = None,
         min_experience: int | None = None,
-        max_experience: int | None = None
+        max_experience: int | None = None,
+        pipeline_stage: str | None = None
     ):
         query = db.query(Candidate)
 
@@ -164,6 +197,9 @@ class CandidateService:
             query = query.filter(
                 Candidate.years_experience <= max_experience
             )
+
+        if pipeline_stage:
+            query = query.filter(Candidate.pipeline_stage == pipeline_stage)
 
         candidates = query.order_by(
             Candidate.created_at.desc()
