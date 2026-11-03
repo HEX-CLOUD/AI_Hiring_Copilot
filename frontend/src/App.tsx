@@ -12,7 +12,7 @@ type CandidateRoleMatch = { job_id: number; job_title?: string | null; match_sco
 type RoleDecisionStatus = 'shortlisted' | 'interview' | 'rejected'
 type RoleDecision = { candidate_id: number; job_id: number; decision: RoleDecisionStatus; notes?: string | null; updated_at: string }
 type AISearchResult = Candidate & { relevance_score: number; matched_terms: string[]; search_explanation: string }
-type InterpretedFilters = { min_experience: number | null; max_experience: number | null; required_skills: string[]; any_skills: string[]; exclusive_skills: string[]; excluded_skills: string[]; required_terms: string[]; skill_operator: 'AND' | 'OR' | 'XOR'; has_constraints: boolean; parser: string; sql_preview?: string }
+type InterpretedFilters = { min_experience: number | null; max_experience: number | null; required_skills: string[]; any_skills: string[]; exclusive_skills: string[]; excluded_skills: string[]; required_terms: string[]; semantic_terms?: string[]; skill_operator: 'AND' | 'OR' | 'XOR'; has_constraints: boolean; parser: string; sql_preview?: string }
 type AIBrief = { answer: string; retrieval_method: string; grounding_note: string; semantic_retrieval_active: boolean; generation_mode: string; retrieval_latency_ms: number; index_sync: { indexed: number; unchanged: number; removed: number; total: number }; interpreted_filters: InterpretedFilters; sources: AISearchResult[] }
 type AIRuntime = { embedding_model: string; vector_store: string; ollama_configured: boolean; ollama_model: string; semantic_retrieval_ready: boolean; generation_ready: boolean; last_error?: string | null }
 type MLStatus = { trained: boolean; training_samples: number; trained_at?: string | null; feature_names: string[]; feature_importances: Record<string, number>; metrics: { mae?: number | null; r2?: number | null }; training_data_source: string; minimum_samples_required: number }
@@ -33,6 +33,7 @@ const queryPlanLabel = (filters: InterpretedFilters) => {
   if (filters.any_skills.length) parts.push(`any of ${filters.any_skills.join(' / ')}`)
   if (filters.excluded_skills.length) parts.push(`excluding ${filters.excluded_skills.join(' / ')}`)
   if (filters.required_terms.length) parts.push(`profile terms: ${filters.required_terms.join(' + ')}`)
+  if (filters.semantic_terms?.length) parts.push(`semantic focus: ${filters.semantic_terms.join(' + ')}`)
   return parts.join(' · ')
 }
 const readableQueryPlan = (filters: InterpretedFilters) => JSON.stringify({
@@ -42,6 +43,7 @@ const readableQueryPlan = (filters: InterpretedFilters) => JSON.stringify({
   skill_operator: filters.skill_operator,
   excluded_skills: filters.excluded_skills,
   required_terms: filters.required_terms,
+  semantic_terms: filters.semantic_terms ?? [],
   semantic_query: filters.has_constraints ? 'Original recruiter query, used only to rerank valid results' : 'Original recruiter query',
 }, null, 2)
 

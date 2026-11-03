@@ -38,6 +38,7 @@ class QueryPlanningService:
                 "max_experience": None,
                 "skills": [],
                 "required_terms": [],
+                "candidate_search": True,
                 "skill_operator": "AND",
                 "excluded_skills": [],
                 "semantic_query": query,
@@ -56,11 +57,15 @@ class QueryPlanningService:
             "Convert the recruiter query into JSON only. Allowed fields: "
             "min_experience (integer or null), max_experience (integer or null), "
             "skills (array), skill_operator (AND, OR, or XOR), excluded_skills (array), "
-            "required_terms (array of role/domain words explicitly present in the query), semantic_query (string). "
+            "required_terms (array of role/domain words explicitly present in the query), candidate_search (boolean), semantic_query (string). "
             "XOR means exactly one listed skill and excludes candidates with both. "
             "Use AND when all named skills are required. Add a filter only when it is explicitly stated in the recruiter query. "
             "For example, 'backend and python' should use skills=['Python'] and required_terms=['backend']. "
             "For a broad semantic query with no explicit constraints, return null experience values and empty skills. "
+            "Set candidate_search=false for general-knowledge questions unrelated to finding or evaluating people, resumes, roles, skills, projects, education, or experience. "
+            "semantic_query must be a short embedding-search reformulation that preserves the recruiter intent and may add closely related professional concepts for a named domain. "
+            "For example, for 'microservices experience', semantic_query can be 'microservices backend distributed services APIs'. "
+            "Do not add hard requirements, candidate names, or unrelated technologies. "
             "Do not infer years of experience, skills, or exclusions from the candidate vocabulary. "
             f"Known skills: {', '.join(vocabulary)}\nRecruiter query: {query}"
         )
@@ -125,16 +130,16 @@ class QueryPlanningService:
             and is_explicitly_mentioned(canonical)
         ]
         requested_terms = plan.get("required_terms") if isinstance(plan.get("required_terms"), list) else []
-        required_terms = []
+        semantic_terms = []
         for term in requested_terms:
             normalized = re.sub(r"\s+", " ", str(term).strip().lower())
             if (
                 len(normalized) >= 3
                 and re.fullmatch(r"[a-z0-9+#. ]+", normalized)
                 and re.search(rf"(?<![a-z0-9]){re.escape(normalized)}(?![a-z0-9])", query.lower())
-                and normalized not in required_terms
+                and normalized not in semantic_terms
             ):
-                required_terms.append(normalized)
+                semantic_terms.append(normalized)
         operator = str(plan.get("skill_operator", "AND")).upper()
         if operator not in QueryPlanningService.OPERATORS:
             operator = "AND"
@@ -144,6 +149,9 @@ class QueryPlanningService:
 
         min_experience = valid_year(plan.get("min_experience"))
         max_experience = valid_year(plan.get("max_experience"))
+        semantic_query = str(plan.get("semantic_query") or "").strip()
+        if not semantic_query or len(semantic_query) > 500:
+            semantic_query = query
         return {
             "min_experience": min_experience,
             "max_experience": max_experience,
@@ -151,9 +159,16 @@ class QueryPlanningService:
             "any_skills": skills if operator == "OR" else [],
             "exclusive_skills": skills if operator == "XOR" else [],
             "excluded_skills": excluded,
-            "required_terms": required_terms,
+            # Role and domain language is deliberately a *semantic focus*, not
+            # a SQL predicate. Requiring the exact word "microservices" would
+            # incorrectly exclude profiles describing the same work as APIs,
+            # backend services, distributed systems, or event-driven systems.
+            # Years, named skills and exclusions remain exact constraints.
+            "required_terms": [],
+            "semantic_terms": semantic_terms,
+            "candidate_search": bool(plan.get("candidate_search", True)),
             "skill_operator": operator,
-            "semantic_query": str(plan.get("semantic_query") or "").strip(),
-            "has_constraints": min_experience is not None or max_experience is not None or bool(skills) or bool(excluded) or bool(required_terms),
+            "semantic_query": semantic_query,
+            "has_constraints": min_experience is not None or max_experience is not None or bool(skills) or bool(excluded),
             "parser": parser,
         }

@@ -124,11 +124,24 @@ class VectorSearchService:
     def search_candidates(db, query: str, limit: int = 10, filters: dict | None = None):
         """Return results plus method metadata, degrading safely if offline."""
         try:
+            if filters and not filters.get("candidate_search", True):
+                return [], {
+                    "method": "Query rejected as outside the candidate knowledge base",
+                    "semantic": True,
+                    "fallback_reason": None,
+                    "index_sync": {"indexed": 0, "unchanged": 0, "removed": 0, "total": 0},
+                }
+            # Domain terms are semantic signals, never literal database filters.
+            # Repeating them lightly gives a short request such as
+            # "microservices" enough semantic weight without inventing a
+            # synonym-based eligibility rule.
+            semantic_terms = (filters or {}).get("semantic_terms", [])
+            retrieval_query = " ".join([query, *semantic_terms]).strip()
             index_sync = VectorSearchService.sync_candidates(db)
             collection = VectorSearchService._collection()
             candidate_count = len(CandidateService.get_all_models(db))
             result = collection.query(
-                query_embeddings=VectorSearchService._embedding([query]),
+                query_embeddings=VectorSearchService._embedding([retrieval_query]),
                 # Query the available pool before filtering. Otherwise, a low
                 # relevance result can crowd out a genuinely relevant one.
                 n_results=max(candidate_count, limit),
@@ -153,7 +166,13 @@ class VectorSearchService:
                 serialized = CandidateService._serialize_candidate(candidate)
                 lexical = SearchService.score_candidate(query, candidate)
                 score = max(0, min(100, round((1 - float(distance)) * 100, 2)))
-                if not has_constraints and not VectorSearchService.is_result_relevant(
+                # A recruiter may ask for a concept that is represented in a
+                # profile with related wording rather than the exact token
+                # (for example service architecture versus microservices).
+                # Those planner-identified domain terms remain semantic-only,
+                # so preserve the nearest evidence instead of requiring a
+                # keyword hit. General-knowledge queries are rejected above.
+                if not has_constraints and not semantic_terms and not VectorSearchService.is_result_relevant(
                     score,
                     lexical["matched_terms"],
                 ):

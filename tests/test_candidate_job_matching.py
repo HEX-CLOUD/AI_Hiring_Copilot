@@ -16,6 +16,7 @@ from app.db.dependencies import get_db
 from app.db.session import SessionLocal, engine
 from app.services.extraction_service import ExtractionService
 from app.core.config import settings
+from app.services.query_planning_service import QueryPlanningService
 from app.services.vector_search_service import VectorSearchService
 from main import app
 
@@ -341,6 +342,29 @@ def test_semantic_relevance_gate_rejects_weak_matches_without_query_evidence():
     assert not VectorSearchService.is_result_relevant(12, [])
     assert VectorSearchService.is_result_relevant(60, [])
     assert VectorSearchService.is_result_relevant(12, ["python"])
+
+
+def test_query_plan_keeps_domain_language_semantic_not_literal_sql():
+    plan = QueryPlanningService._validate(
+        {
+            "min_experience": None,
+            "max_experience": None,
+            "skills": [],
+            "skill_operator": "AND",
+            "excluded_skills": [],
+            "required_terms": ["microservices"],
+            "candidate_search": True,
+            "semantic_query": "microservices",
+        },
+        ["Python", "Java"],
+        "test",
+        "find candidates with microservices experience",
+    )
+
+    assert plan["required_terms"] == []
+    assert plan["semantic_terms"] == ["microservices"]
+    assert plan["candidate_search"] is True
+    assert not plan["has_constraints"]
 
 
 def test_job_description_extraction_helpers():
