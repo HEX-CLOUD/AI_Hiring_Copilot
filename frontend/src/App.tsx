@@ -12,7 +12,7 @@ type CandidateRoleMatch = { job_id: number; job_title?: string | null; match_sco
 type RoleDecisionStatus = 'shortlisted' | 'interview' | 'rejected'
 type RoleDecision = { candidate_id: number; job_id: number; decision: RoleDecisionStatus; notes?: string | null; updated_at: string }
 type AISearchResult = Candidate & { relevance_score: number; matched_terms: string[]; search_explanation: string }
-type InterpretedFilters = { min_experience: number | null; max_experience: number | null; required_skills: string[]; any_skills: string[]; exclusive_skills: string[]; excluded_skills: string[]; skill_operator: 'AND' | 'OR' | 'XOR'; has_constraints: boolean; parser: string; sql_preview?: string }
+type InterpretedFilters = { min_experience: number | null; max_experience: number | null; required_skills: string[]; any_skills: string[]; exclusive_skills: string[]; excluded_skills: string[]; required_terms: string[]; skill_operator: 'AND' | 'OR' | 'XOR'; has_constraints: boolean; parser: string; sql_preview?: string }
 type AIBrief = { answer: string; retrieval_method: string; grounding_note: string; semantic_retrieval_active: boolean; generation_mode: string; retrieval_latency_ms: number; index_sync: { indexed: number; unchanged: number; removed: number; total: number }; interpreted_filters: InterpretedFilters; sources: AISearchResult[] }
 type AIRuntime = { embedding_model: string; vector_store: string; ollama_configured: boolean; ollama_model: string; semantic_retrieval_ready: boolean; generation_ready: boolean; last_error?: string | null }
 type View = 'overview' | 'candidates' | 'roles' | 'ai'
@@ -31,6 +31,7 @@ const queryPlanLabel = (filters: InterpretedFilters) => {
   if (filters.required_skills.length) parts.push(`all of ${filters.required_skills.join(' + ')}`)
   if (filters.any_skills.length) parts.push(`any of ${filters.any_skills.join(' / ')}`)
   if (filters.excluded_skills.length) parts.push(`excluding ${filters.excluded_skills.join(' / ')}`)
+  if (filters.required_terms.length) parts.push(`profile terms: ${filters.required_terms.join(' + ')}`)
   return parts.join(' · ')
 }
 const readableQueryPlan = (filters: InterpretedFilters) => JSON.stringify({
@@ -39,6 +40,7 @@ const readableQueryPlan = (filters: InterpretedFilters) => JSON.stringify({
   skills: filters.exclusive_skills.length ? filters.exclusive_skills : filters.required_skills.length ? filters.required_skills : filters.any_skills,
   skill_operator: filters.skill_operator,
   excluded_skills: filters.excluded_skills,
+  required_terms: filters.required_terms,
   semantic_query: filters.has_constraints ? 'Original recruiter query, used only to rerank valid results' : 'Original recruiter query',
 }, null, 2)
 
@@ -332,7 +334,7 @@ function AIWorkspace({ query, setQuery, brief, runtime, loading, run, reindex, o
           <article><b>03 · Semantic retrieval and reranking</b><p>{brief.retrieval_method}. MiniLM retrieves profile embeddings from ChromaDB; SQL-filtered candidates remain the only eligible results.</p><div className="pipeline-stat"><span>Retrieved evidence</span><b>{brief.sources.length} profile{brief.sources.length === 1 ? '' : 's'}</b><span>Latency</span><b>{Math.round(brief.retrieval_latency_ms)} ms</b></div></article>
           <article><b>04 · Grounded response</b><p>{brief.generation_mode === 'ollama-rag' ? `Ollama ${runtime?.ollama_model ?? 'Phi-3'} generated the written brief using only the retrieved profile evidence.` : 'This result is retrieval-only. Select “Generate local brief” to ask the local model for a grounded summary.'}</p></article>
         </div></details>
-        <footer><span>{brief.semantic_retrieval_active ? 'Live vector retrieval' : 'Retrieval fallback'}</span><span>{brief.generation_mode === 'ollama-rag' ? 'Local LLM synthesis' : 'Retrieval-only evidence'}</span><span>{Math.round(brief.retrieval_latency_ms)} ms · {brief.index_sync.indexed ? `${brief.index_sync.indexed} profile update${brief.index_sync.indexed === 1 ? '' : 's'}` : 'index current'}</span>{runtime?.generation_ready && brief.generation_mode !== 'ollama-rag' && <button className="secondary-button" onClick={() => void run(true)} disabled={loading}><Sparkles size={15} />Generate local brief</button>}<small>{brief.grounding_note}</small></footer>
+        <footer><span>{brief.semantic_retrieval_active ? 'Live vector retrieval' : 'Retrieval fallback'}</span><span>{brief.generation_mode === 'ollama-rag' ? 'Local LLM synthesis' : 'Retrieval-only evidence'}</span><span>{Math.round(brief.retrieval_latency_ms)} ms · {brief.index_sync.indexed ? `${brief.index_sync.indexed} profile update${brief.index_sync.indexed === 1 ? '' : 's'}` : 'index current'}</span>{runtime?.generation_ready && brief.generation_mode !== 'ollama-rag' && <button className="secondary-button" onClick={() => void run(true)} disabled={loading}><Sparkles size={15} />{loading ? 'Generating locally…' : 'Generate local brief'}</button>}<small>{brief.grounding_note}</small></footer>
       </section>
       <section className="ai-sources surface"><Header label="Retrieved evidence" title={`${brief.sources.length} candidate sources`} />{brief.sources.length ? brief.sources.map((source, index) => <button key={source.id} onClick={() => void openCandidate(source)}><Avatar name={source.full_name} index={index} /><span><b>{source.full_name}</b><small>{source.search_explanation}</small><em>{source.matched_terms.join(' · ')}</em></span><i>{Math.round(source.relevance_score)}%</i><ChevronRight size={17} /></button>) : <Empty text="No candidate satisfied every interpreted constraint." />}</section>
     </section> : <section className="ai-empty surface"><BrainCircuit size={28} /><h3>Semantic candidate discovery</h3><p>Run a natural-language query to retrieve profile evidence and a grounded recruiter brief.</p></section>}

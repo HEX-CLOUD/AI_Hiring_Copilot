@@ -159,6 +159,7 @@ class SearchService:
         alternatives = [has_skill(skill) for skill in filters.get("any_skills", [])]
         exclusive = [has_skill(skill) for skill in filters.get("exclusive_skills", [])]
         excluded = [has_skill(skill) for skill in filters.get("excluded_skills", [])]
+        required_terms = filters.get("required_terms", [])
         if required:
             clauses.append(and_(*required))
         if alternatives:
@@ -169,6 +170,12 @@ class SearchService:
             clauses.append(sum((case((predicate, 1), else_=0) for predicate in exclusive), literal(0)) == 1)
         if excluded:
             clauses.extend(not_(predicate) for predicate in excluded)
+        if required_terms:
+            profile_text = func.lower(func.coalesce(Candidate.source_text, ""))
+            clauses.extend(
+                profile_text.like(f"%{escape_like(term)}%", escape="\\")
+                for term in required_terms
+            )
 
         if clauses:
             query = query.filter(and_(*clauses))

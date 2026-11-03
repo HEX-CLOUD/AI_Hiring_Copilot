@@ -37,6 +37,7 @@ class QueryPlanningService:
                 "min_experience": None,
                 "max_experience": None,
                 "skills": [],
+                "required_terms": [],
                 "skill_operator": "AND",
                 "excluded_skills": [],
                 "semantic_query": query,
@@ -55,8 +56,10 @@ class QueryPlanningService:
             "Convert the recruiter query into JSON only. Allowed fields: "
             "min_experience (integer or null), max_experience (integer or null), "
             "skills (array), skill_operator (AND, OR, or XOR), excluded_skills (array), "
-            "semantic_query (string). XOR means exactly one listed skill and excludes candidates with both. "
+            "required_terms (array of role/domain words explicitly present in the query), semantic_query (string). "
+            "XOR means exactly one listed skill and excludes candidates with both. "
             "Use AND when all named skills are required. Add a filter only when it is explicitly stated in the recruiter query. "
+            "For example, 'backend and python' should use skills=['Python'] and required_terms=['backend']. "
             "For a broad semantic query with no explicit constraints, return null experience values and empty skills. "
             "Do not infer years of experience, skills, or exclusions from the candidate vocabulary. "
             f"Known skills: {', '.join(vocabulary)}\nRecruiter query: {query}"
@@ -121,6 +124,17 @@ class QueryPlanningService:
             if (canonical := vocabulary_map.get(MatchingService.normalize_skill(str(skill))))
             and is_explicitly_mentioned(canonical)
         ]
+        requested_terms = plan.get("required_terms") if isinstance(plan.get("required_terms"), list) else []
+        required_terms = []
+        for term in requested_terms:
+            normalized = re.sub(r"\s+", " ", str(term).strip().lower())
+            if (
+                len(normalized) >= 3
+                and re.fullmatch(r"[a-z0-9+#. ]+", normalized)
+                and re.search(rf"(?<![a-z0-9]){re.escape(normalized)}(?![a-z0-9])", query.lower())
+                and normalized not in required_terms
+            ):
+                required_terms.append(normalized)
         operator = str(plan.get("skill_operator", "AND")).upper()
         if operator not in QueryPlanningService.OPERATORS:
             operator = "AND"
@@ -137,8 +151,9 @@ class QueryPlanningService:
             "any_skills": skills if operator == "OR" else [],
             "exclusive_skills": skills if operator == "XOR" else [],
             "excluded_skills": excluded,
+            "required_terms": required_terms,
             "skill_operator": operator,
             "semantic_query": str(plan.get("semantic_query") or "").strip(),
-            "has_constraints": min_experience is not None or max_experience is not None or bool(skills) or bool(excluded),
+            "has_constraints": min_experience is not None or max_experience is not None or bool(skills) or bool(excluded) or bool(required_terms),
             "parser": parser,
         }
