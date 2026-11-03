@@ -13,6 +13,16 @@ class ScoreComponentResponse(BaseModel):
     description: str
 
 
+class MLCalibrationResponse(BaseModel):
+    learned_score: float
+    baseline_score: float
+    delta: float
+    agreement: str
+    uncertainty: float
+    top_signals: list[str]
+    note: str
+
+
 class CandidateJobMatchResponse(BaseModel):
     candidate_id: int
     candidate_name: str
@@ -27,6 +37,7 @@ class CandidateJobMatchResponse(BaseModel):
     score_breakdown: list[ScoreComponentResponse]
     fairness_note: str
     fit_explanation: str
+    ml_calibration: MLCalibrationResponse | None = None
 
 
 class CandidateJobInsightResponse(CandidateJobMatchResponse):

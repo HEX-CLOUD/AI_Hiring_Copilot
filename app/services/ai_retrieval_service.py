@@ -73,11 +73,7 @@ class AIRetrievalService:
 
     @staticmethod
     def _generate_answer(query: str, sources: list[dict], leaders: str) -> tuple[str, str, str | None]:
-        fallback = (
-            f"Grounded AI retrieval found {len(sources)} relevant candidate "
-            f"profile{'s' if len(sources) != 1 else ''} for '{query}'. "
-            f"Top evidence: {leaders}. Review the retrieved evidence before making a decision."
-        )
+        fallback = AIRetrievalService._deterministic_brief(query, sources)
         if not settings.OLLAMA_BASE_URL:
             return fallback, "deterministic-grounded-summary", None
         evidence = "\n".join(
@@ -86,11 +82,11 @@ class AIRetrievalService:
             f"  Listed skills: {', '.join(item['skills']) or 'not listed'}\n"
             f"  Listed projects: {'; '.join(item['projects']) or 'not listed'}\n"
             f"  Listed work history: {'; '.join(item['work_history']) or 'not listed'}"
-            for item in sources[:5]
+            for item in sources[:2]
         )
         prompt = (
             "You are TalentIQ, a recruiting decision-support assistant. "
-            "Write a concise evidence brief in 2-4 bullets using ONLY the supplied profile facts. "
+            "Write exactly 2 one-sentence bullets using ONLY the supplied profile facts. "
             "Each bullet must name the candidate and state only listed skills, listed projects, listed work history, or stated years. "
             "Do not invent a job description, project, requirement, qualification, or outcome. "
             "Do not claim a candidate is suitable, aligned, eligible, selected, or recommended. "
@@ -103,15 +99,35 @@ class AIRetrievalService:
                 "model": settings.OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False,
-                "options": {"temperature": 0.2, "num_predict": settings.OLLAMA_MAX_TOKENS},
+                "keep_alive": "10m",
+                "options": {"temperature": 0.1, "num_predict": min(settings.OLLAMA_MAX_TOKENS, 60)},
             }).encode()
             response = request.urlopen(
                 request.Request(f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate", data=body, headers={"Content-Type": "application/json"}),
-                timeout=settings.OLLAMA_TIMEOUT_SECONDS,
+                timeout=min(settings.OLLAMA_TIMEOUT_SECONDS, 12),
             )
-            generated = json.loads(response.read().decode()).get("response", "").strip()
-            if generated:
+            generated = AIRetrievalService._clean_generated(json.loads(response.read().decode()).get("response", ""))
+            if generated and any(source["full_name"] in generated for source in sources[:3]):
                 return generated, "ollama-rag", settings.OLLAMA_MODEL
             return fallback, "deterministic-grounded-summary", None
         except (error.URLError, TimeoutError, json.JSONDecodeError, OSError):
             return fallback, "deterministic-grounded-summary", None
+
+    @staticmethod
+    def _clean_generated(text: str) -> str:
+        cleaned = text.replace("end_of_doc", "").replace("<|endoftext|>", "").strip()
+        return cleaned[:2400].strip()
+
+    @staticmethod
+    def _deterministic_brief(query: str, sources: list[dict]) -> str:
+        bullets = []
+        for item in sources[:2]:
+            evidence = []
+            if item.get("years_experience") is not None:
+                evidence.append(f"{item['years_experience']} years of experience")
+            if item.get("skills"):
+                evidence.append(f"skills: {', '.join(item['skills'][:4])}")
+            if item.get("projects"):
+                evidence.append(f"project evidence: {item['projects'][0]}")
+            bullets.append(f"- {item['full_name']}: {'; '.join(evidence) or 'limited structured evidence listed.'}")
+        return f"Grounded brief for '{query}':\n" + "\n".join(bullets)

@@ -155,17 +155,31 @@ def seed():
                 db.refresh(job)
             job_models.append(job)
 
-        # Add 12 varied decisions across technical and non-technical roles.
-        outcomes = ["interview", "shortlisted", "rejected", "shortlisted"]
-        for index, candidate in enumerate(candidate_models[:12]):
-            job = job_models[index % len(job_models)]
-            DecisionService.upsert(
-                db,
-                candidate.id,
-                job.id,
-                outcomes[index % len(outcomes)],
-                "Synthetic demo label for model-training workflow; validate with a recruiter before using in research results.",
-            )
+        # Build a reproducible candidate-job training matrix. These are
+        # explicitly synthetic workflow labels for the demo, derived from
+        # transparent job-fit and role-evidence signals rather than arbitrary
+        # random outcomes. Real deployments must replace them with audited
+        # recruiter feedback.
+        for candidate in candidate_models:
+            for job in job_models:
+                features = RankingModelService._features(candidate, job)
+                evidence_score = (
+                    features["baseline_match_score"] * 0.8
+                    + features["role_evidence_overlap"] * 100 * 0.2
+                )
+                if evidence_score >= 78:
+                    outcome = "interview"
+                elif evidence_score >= 35 and features["experience_coverage"] >= 1:
+                    outcome = "shortlisted"
+                else:
+                    outcome = "rejected"
+                DecisionService.upsert(
+                    db,
+                    candidate.id,
+                    job.id,
+                    outcome,
+                    "Synthetic demo workflow label derived from stated job-fit and role evidence; not a real hiring outcome.",
+                )
 
         training = RankingModelService.train(db)
         return {

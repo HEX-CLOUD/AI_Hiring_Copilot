@@ -75,6 +75,7 @@ class QueryPlanningService:
                 "prompt": prompt,
                 "stream": False,
                 "format": "json",
+                "keep_alive": "10m",
                 "options": {"temperature": 0, "num_predict": 220},
             }).encode()
             response = request.urlopen(

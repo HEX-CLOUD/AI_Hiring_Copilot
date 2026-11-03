@@ -29,6 +29,7 @@ from app.services.matching_service import (
 from app.services.insight_service import InsightService
 from app.services.candidate_service import CandidateService
 from app.services.decision_service import DecisionService
+from app.services.ranking_model_service import RankingModelService
 
 from app.services.parsers.pdf_parser import (
     PDFParser
@@ -94,10 +95,12 @@ def rank_candidates_for_job(
             detail="Job not found"
         )
 
-    return MatchingService.rank_candidates_for_job(
-        CandidateService.get_all_models(db),
-        job
-    )
+    candidates = CandidateService.get_all_models(db)
+    matches = MatchingService.rank_candidates_for_job(candidates, job)
+    by_id = {candidate.id: candidate for candidate in candidates}
+    for match in matches:
+        match["ml_calibration"] = RankingModelService.calibrate_match(by_id[match["candidate_id"]], job)
+    return matches
 
 
 @router.get(
@@ -348,7 +351,9 @@ async def match_job(
             detail="Job not found"
         )
 
-    return MatchingService.rank_candidates_for_job(
-        CandidateService.get_all_models(db),
-        job
-    )
+    candidates = CandidateService.get_all_models(db)
+    matches = MatchingService.rank_candidates_for_job(candidates, job)
+    by_id = {candidate.id: candidate for candidate in candidates}
+    for match in matches:
+        match["ml_calibration"] = RankingModelService.calibrate_match(by_id[match["candidate_id"]], job)
+    return matches

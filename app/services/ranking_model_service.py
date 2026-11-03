@@ -6,9 +6,12 @@ ground truth while still providing a real ML training and evaluation path.
 """
 
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
+import re
 
 import joblib
+import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
@@ -28,12 +31,19 @@ class RankingModelService:
         "certification_count",
         "profile_completeness",
         "baseline_match_score",
+        "role_evidence_overlap",
     ]
     DECISION_LABELS = {"rejected": 0.0, "shortlisted": 0.7, "interview": 1.0}
 
     @staticmethod
     def _model_path() -> Path:
         return Path(settings.RANKING_MODEL_PATH)
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _artifact() -> dict | None:
+        path = RankingModelService._model_path()
+        return joblib.load(path) if path.exists() else None
 
     @staticmethod
     def _features(candidate, job) -> dict[str, float]:
@@ -48,6 +58,17 @@ class RankingModelService:
             candidate.certifications,
             candidate.work_history,
         ])
+        job_terms = {
+            term for term in re.findall(r"[a-zA-Z]{3,}", f"{job.title or ''} {job.description or ''}".lower())
+            if term not in {"senior", "engineer", "role", "with", "and", "the", "for"}
+        }
+        evidence_text = " ".join([
+            " ".join(candidate.projects or []),
+            " ".join(candidate.work_history or []),
+            " ".join(candidate.skills or []),
+        ]).lower()
+        evidence_terms = set(re.findall(r"[a-zA-Z]{3,}", evidence_text))
+        evidence_overlap = len(job_terms & evidence_terms) / len(job_terms) if job_terms else 0.0
         return {
             "skill_coverage": round(len(match["matched_skills"]) / required_skills, 4) if required_skills else 0.0,
             "experience_coverage": round(experience_coverage, 4),
@@ -55,6 +76,7 @@ class RankingModelService:
             "certification_count": float(len(candidate.certifications or [])),
             "profile_completeness": round(completed_sections / 4, 4),
             "baseline_match_score": float(match["match_score"]),
+            "role_evidence_overlap": round(evidence_overlap, 4),
         }
 
     @staticmethod
@@ -79,7 +101,6 @@ class RankingModelService:
 
     @staticmethod
     def status() -> dict:
-        path = RankingModelService._model_path()
         base = {
             "trained": False,
             "training_samples": 0,
@@ -90,15 +111,62 @@ class RankingModelService:
             "training_data_source": "recruiter decisions",
             "minimum_samples_required": settings.RANKING_MIN_TRAINING_SAMPLES,
         }
-        if not path.exists():
+        artifact = RankingModelService._artifact()
+        if artifact is None:
             return base
-        artifact = joblib.load(path)
         return {**base, **artifact["metadata"], "trained": True}
+
+    @staticmethod
+    def calibrate_match(candidate, job) -> dict | None:
+        """Return a labelled-data calibration alongside the transparent score.
+
+        This is deliberately a comparison signal only. It is learned from
+        recorded recruiter workflow labels and must not replace human review.
+        """
+        try:
+            artifact = RankingModelService._artifact()
+            if artifact is None:
+                return None
+            model = artifact["model"]
+            features = RankingModelService._features(candidate, job)
+            row = [[features[name] for name in RankingModelService.FEATURE_NAMES]]
+            learned_score = float(model.predict(row)[0]) * 100
+            tree_scores = [float(tree.predict(row)[0]) * 100 for tree in model.estimators_]
+            uncertainty = float(np.std(tree_scores))
+            baseline_score = features["baseline_match_score"]
+            delta = learned_score - baseline_score
+            if delta >= 8:
+                agreement = "higher than baseline"
+            elif delta <= -8:
+                agreement = "lower than baseline"
+            else:
+                agreement = "close to baseline"
+            importance = artifact.get("metadata", {}).get("feature_importances", {})
+            top_signals = [
+                name.replace("_", " ")
+                for name, _ in sorted(importance.items(), key=lambda item: item[1], reverse=True)[:3]
+            ]
+            return {
+                "learned_score": round(max(0, min(100, learned_score)), 1),
+                "baseline_score": round(baseline_score, 1),
+                "delta": round(delta, 1),
+                "agreement": agreement,
+                "uncertainty": round(uncertainty, 1),
+                "top_signals": top_signals,
+                "note": "Offline research calibration from recorded recruiter workflow labels; review evidence before any decision.",
+            }
+        except (KeyError, TypeError, ValueError, OSError):
+            return None
 
     @staticmethod
     def train(db) -> dict:
         records = RankingModelService.dataset_records(db)
         labels = [record["label"] for record in records]
+        decisions = db.query(CandidateJobDecision).all()
+        synthetic_demo_labels = bool(decisions) and all(
+            "synthetic demo" in (decision.notes or "").lower()
+            for decision in decisions
+        )
         if len(records) < settings.RANKING_MIN_TRAINING_SAMPLES:
             raise ValueError(
                 f"At least {settings.RANKING_MIN_TRAINING_SAMPLES} labelled recruiter decisions are required; found {len(records)}."
@@ -129,8 +197,12 @@ class RankingModelService:
                 for name, importance in zip(RankingModelService.FEATURE_NAMES, model.feature_importances_)
             },
             "metrics": metrics,
+            "training_data_source": (
+                "synthetic demo workflow labels" if synthetic_demo_labels else "recruiter decisions"
+            ),
         }
         path = RankingModelService._model_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump({"model": model, "metadata": metadata}, path)
+        RankingModelService._artifact.cache_clear()
         return {**RankingModelService.status(), "message": "Ranking model trained from recruiter decisions."}
