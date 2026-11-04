@@ -1,4 +1,5 @@
 from app.models.candidate_job_decision import CandidateJobDecision
+from sqlalchemy import func, or_
 
 
 class DecisionService:
@@ -16,7 +17,15 @@ class DecisionService:
     def get_for_job(db, job_id: int):
         records = (
             db.query(CandidateJobDecision)
-            .filter(CandidateJobDecision.job_id == job_id)
+            .filter(
+                CandidateJobDecision.job_id == job_id,
+                # Synthetic rows exist only to demonstrate ML training. They
+                # must never be presented as recruiter actions in the UI.
+                or_(
+                    CandidateJobDecision.notes.is_(None),
+                    ~func.lower(CandidateJobDecision.notes).like("synthetic%"),
+                ),
+            )
             .order_by(CandidateJobDecision.updated_at.desc())
             .all()
         )

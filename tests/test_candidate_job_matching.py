@@ -625,6 +625,28 @@ def test_job_candidate_decision_is_saved_and_updated():
     assert decisions.json() == [second.json()]
 
 
+def test_synthetic_training_decisions_are_not_shown_in_recruiter_workflow():
+    client = TestClient(app)
+    candidate = client.post(
+        "/api/v1/candidates/",
+        json={"full_name": "Synthetic Decision Candidate", "email": "synthetic-decision@example.com"},
+    ).json()
+    job = client.post(
+        "/api/v1/jobs/",
+        json={"title": "Synthetic Decision Job", "skills": ["Python"]},
+    ).json()
+
+    response = client.put(
+        f"/api/v1/jobs/{job['id']}/candidates/{candidate['id']}/decision",
+        json={"decision": "rejected", "notes": "Synthetic demo workflow label for training."},
+    )
+    assert response.status_code == 200
+
+    decisions = client.get(f"/api/v1/jobs/{job['id']}/decisions")
+    assert decisions.status_code == 200
+    assert decisions.json() == []
+
+
 def test_resume_docx_upload_extracts_and_stores_candidate(monkeypatch):
     monkeypatch.setattr(
         resume_endpoint,
