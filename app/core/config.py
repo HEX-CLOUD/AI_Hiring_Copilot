@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./ai_hiring.db"
-    CHROMA_PERSIST_DIRECTORY: str = "./data/chroma"
+    CHROMA_PERSIST_DIRECTORY: str = "./artifacts/rag_vector_store"
     EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"
     # The demo ships with MiniLM downloaded locally. Avoid Hugging Face network
     # retries during a presentation; set this to false only when intentionally
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "phi3:mini"
     OLLAMA_TIMEOUT_SECONDS: int = 30
     OLLAMA_MAX_TOKENS: int = 350
-    RANKING_MODEL_PATH: str = "./data/models/ranking_model.joblib"
+    RANKING_MODEL_PATH: str = "./artifacts/ml_models/ranking_model.joblib"
     RANKING_MIN_TRAINING_SAMPLES: int = 6
 
     model_config = SettingsConfigDict(

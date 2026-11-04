@@ -19,5 +19,5 @@ tests/_tmp_uploads/
 
 postgres_data/
 uploads/
-data/chroma/
-data/models/
+artifacts/rag_vector_store/
+artifacts/ml_models/
